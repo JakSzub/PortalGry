@@ -5,28 +5,19 @@ news_items = [
                  {
                      "id":1,
                      "title": "KK",
-                     "image": "https://picsum.photos/400/200?random=3",
-                     "description": "W trakcie wydarzenia zdobywasz unikalne samoloty.",
-                     "date": "10 kwietnia 2025",
-                     "label": None,
-                     "iframe": 'kk/index.html'
+                     "image": "https://pierwszytrener.pl/wp-content/uploads/2014/03/kolko-i-krzyzyk.jpg",
+
                  },
                  {
                     "id":2,
                      "title": "Snake",
-                     "image": "https://picsum.photos/400/200?random=4",
-                     "description": "",
-                     "date": "23 kwietnia 2025",
-                     "label": "Akcja",
+                     "image": "https://www.nhm.ac.uk/content/dam/nhm-www/discover/giant-snakes/reticulated-python-longest-snake-full-width.jpg",
                      "iframe": 'snake/index.html'
                  },
                  {
                     "id":3,
                      "title": "Tetris",
-                     "image": "https://picsum.photos/400/200?random=5",
-                     "description": "",
-                     "date": "23 kwietnia 2025",
-                     "label": None,
+                     "image": "https://st2.depositphotos.com/1439706/5679/v/450/depositphotos_56794325-stock-illustration-dark-flat-tetris-background.jpg",
                       "iframe": 'tetris/index.html'
                  },
              ]

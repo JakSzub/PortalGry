@@ -4,78 +4,231 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kółko i Krzyżyk</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
-    <script defer src="scripts.js"></script>
     <style>
         body {
-            background-color: #f4f4f4;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
         }
-        .game-container {
-            max-width: 400px;
-            margin: 50px auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
-            text-align: center;
+
+        .status-display {
+            font-size: 1.8em;
+            margin-bottom: 25px;
+            min-height: 1.2em;
+            color: #e67e22;
+        }
+
+        .board-container {
             position: relative;
+            width: 306px;
+            height: 306px;
         }
+
         .board {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             grid-template-rows: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 20px;
-            position: relative;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #1abc9c;
+            border-radius: 8px;
+            overflow: hidden;
         }
+
         .cell {
             width: 100px;
             height: 100px;
             display: flex;
-            align-items: center;
             justify-content: center;
-            font-size: 2.5rem;
+            align-items: center;
+            font-size: 3.5em;
             font-weight: bold;
-            background: #f5f5f5;
-            border-radius: 8px;
             cursor: pointer;
-            transition: all 0.3s ease-in-out;
-            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+            border: 3px solid #1abc9c;
+            color: #ecf0f1;
+            transition: background-color 0.2s ease;
         }
-        .cell:hover {
-            background-color: #e0e0e0;
-            transform: scale(1.05);
-        }
-        .cell.x { color: #2196F3; }
-        .cell.o { color: #F44336; }
 
-        /* Linia przekreślająca */
-        .win-line {
+        .cell:hover:not(.occupied) {
+            background-color: #34495e;
+        }
+
+        .cell.X { color: #3498db; }
+        .cell.O { color: #e74c3c; }
+
+
+        #winningLineCanvas {
             position: absolute;
-            background: red;
-            height: 5px;
-            width: 0;
-            transition: width 0.3s ease-in-out;
-            transform-origin: left center;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
 
-        #reset {
-            margin-top: 20px;
-            font-size: 1.1rem;
-            padding: 10px 20px;
+        .reset-button {
+            margin-top: 30px;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .reset-button:hover {
+            background-color: #2980b9;
         }
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <h1 class="title">Kółko i Krzyżyk</h1>
-        <div id="game-status" class="notification is-info">
-            Tura gracza: <span id="current-player">X</span>
-        </div>
+    <div class="status-display" id="statusDisplay">Tura gracza X</div>
+    <div class="board-container">
         <div class="board" id="board">
-            <div class="win-line" id="win-line"></div>
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
         </div>
-        <button class="button is-primary is-fullwidth" id="reset">Resetuj grę</button>
+        <canvas id="winningLineCanvas"></canvas>
     </div>
+    <button class="reset-button" id="resetButton">Zagraj Ponownie</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('board');
+            const cells = document.querySelectorAll('.cell');
+            const statusDisplay = document.getElementById('statusDisplay');
+            const resetButton = document.getElementById('resetButton');
+            const canvas = document.getElementById('winningLineCanvas');
+            const ctx = canvas.getContext('2d');
+
+            let boardState = ['', '', '', '', '', '', '', '', ''];
+            let currentPlayer = 'X';
+            let gameActive = true;
+
+            const winningConditions = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6]
+            ];
+
+            function initializeCanvas() {
+                const boardRect = boardElement.getBoundingClientRect();
+                canvas.width = boardRect.width;
+                canvas.height = boardRect.height;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
+            initializeCanvas();
+            window.addEventListener('resize', initializeCanvas);
+
+
+            function handleCellClick(event) {
+                const clickedCell = event.target;
+                const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
+
+                if (boardState[clickedCellIndex] !== '' || !gameActive) {
+                    return;
+                }
+
+                boardState[clickedCellIndex] = currentPlayer;
+                clickedCell.textContent = currentPlayer;
+                clickedCell.classList.add(currentPlayer);
+                clickedCell.classList.add('occupied');
+
+                checkResult();
+            }
+
+            function checkResult() {
+                let roundWon = false;
+                let winningCombination = null;
+
+                for (let i = 0; i < winningConditions.length; i++) {
+                    const winCondition = winningConditions[i];
+                    const a = boardState[winCondition[0]];
+                    const b = boardState[winCondition[1]];
+                    const c = boardState[winCondition[2]];
+
+                    if (a === '' || b === '' || c === '') {
+                        continue;
+                    }
+                    if (a === b && b === c) {
+                        roundWon = true;
+                        winningCombination = winCondition;
+                        break;
+                    }
+                }
+
+                if (roundWon) {
+                    statusDisplay.textContent = `Gracz ${currentPlayer} wygrywa!`;
+                    gameActive = false;
+                    drawWinningLine(winningCombination);
+                    return;
+                }
+
+                if (!boardState.includes('')) {
+                    statusDisplay.textContent = 'Remis!';
+                    gameActive = false;
+                    return;
+                }
+
+                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                statusDisplay.textContent = `Tura gracza ${currentPlayer}`;
+            }
+
+            function drawWinningLine(combination) {
+                const cellElements = Array.from(cells);
+                const startCell = cellElements[combination[0]];
+                const endCell = cellElements[combination[2]];
+
+                const startRect = startCell.getBoundingClientRect();
+                const endRect = endCell.getBoundingClientRect();
+                const boardRect = boardElement.getBoundingClientRect();
+
+                const startX = startRect.left + startRect.width / 2 - boardRect.left;
+                const startY = startRect.top + startRect.height / 2 - boardRect.top;
+                const endX = endRect.left + endRect.width / 2 - boardRect.left;
+                const endY = endRect.top + endRect.height / 2 - boardRect.top;
+
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = '#f1c40f';
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+
+
+            function resetGame() {
+                boardState = ['', '', '', '', '', '', '', '', ''];
+                gameActive = true;
+                currentPlayer = 'X';
+                statusDisplay.textContent = `Tura gracza ${currentPlayer}`;
+                cells.forEach(cell => {
+                    cell.textContent = '';
+                    cell.classList.remove('X', 'O', 'occupied');
+                });
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
+            cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+            resetButton.addEventListener('click', resetGame);
+        });
+    </script>
 </body>
 </html>

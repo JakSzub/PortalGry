@@ -3,46 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Game</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
-    <script defer src="scripts.js"></script>
+    <title>Gra Wąż</title>
     <style>
         body {
-            background-color: #f4f4f4;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding-top: 10px;
+            overflow: hidden;
         }
-        .game-container {
-            max-width: 500px;
-            margin: 50px auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
-            text-align: center;
+        .game-wrapper {
+            border: 3px solid #ecf0f1;
+            background-color: #34495e;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
-        canvas {
-            background: #ddd;
+        #gameCanvas {
             display: block;
-            margin: auto;
-            border-radius: 10px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
         }
-        .title {
-            color: #4A90E2;
-            font-weight: bold;
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            width: 400px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
         }
-        .score {
-            font-size: 1.5em;
-            font-weight: bold;
-            margin: 10px 0;
+        .hud span {
+            background-color: #34495e;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        #messageScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 100;
+        }
+        #messageScreen h2 {
+            font-size: 2.5em;
+            color: #e67e22;
+        }
+        #messageScreen p {
+            font-size: 1.2em;
+            line-height: 1.6;
+            max-width: 80%;
+        }
+        #messageScreen .controls {
+            font-size: 0.9em;
+            margin-top:10px;
+        }
+        #messageScreen .controls strong {
+             color: #f1c40f;
         }
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <h1 class="title">Snake</h1>
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
-        <p id="score" class="score">Wynik: 0</p>
-        <button class="button is-success is-fullwidth" id="restart">Restart</button>
+    <div class="hud">
+        <p>Wynik: <span id="currentScore">0</span></p>
+        <p>Najlepszy: <span id="highScore">0</span></p>
     </div>
+    <div class="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="messageScreen">
+        <h2 id="messageTitle">Witaj w Grze Wąż!</h2>
+        <p id="messageText">Naciśnij dowolny klawisz strzałki lub WASD, aby rozpocząć.</p>
+        <div class="controls">
+            <p><strong>Strzałki/WASD</strong>: Sterowanie</p>
+            <p><strong>P</strong>: Pauza/Wznów</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const currentScoreEl = document.getElementById('currentScore');
+            const highScoreEl = document.getElementById('highScore');
+
+            const messageScreen = document.getElementById('messageScreen');
+            const messageTitleEl = document.getElementById('messageTitle');
+            const messageTextEl = document.getElementById('messageText');
+
+            const GRID_SIZE = 20;
+            const TILE_COUNT_X = 20;
+            const TILE_COUNT_Y = 20;
+
+            canvas.width = TILE_COUNT_X * GRID_SIZE;
+            canvas.height = TILE_COUNT_Y * GRID_SIZE;
+
+            let snake, food, goldenFood, direction, score, highScore, gameOver, paused, gameSpeed, initialSpeed, speedIncrement;
+            let lastTime, timer, animationFrameId;
+
+            const SNAKE_COLOR = '#2ecc71';
+            const SNAKE_HEAD_COLOR = '#27ae60';
+            const FOOD_COLOR = '#e74c3c';
+            const GOLDEN_FOOD_COLOR = '#f1c40f';
+            const BACKGROUND_COLOR = '#34495e';
+            const GRID_COLOR = 'rgba(0,0,0,0.05)';
+
+            function initGameVariables() {
+                snake = [{ x: Math.floor(TILE_COUNT_X / 2), y: Math.floor(TILE_COUNT_Y / 2) }];
+                direction = { x: 0, y: 0 };
+                placeFood();
+                goldenFood = null;
+                score = 0;
+                highScore = localStorage.getItem('snakeHighScoreV2') || 0; // Zmieniony klucz dla nowego trybu
+                gameOver = false;
+                paused = true;
+                initialSpeed = 150;
+                gameSpeed = initialSpeed;
+                speedIncrement = 2;
+                lastTime = 0;
+                timer = 0;
+                updateScoreDisplay();
+            }
+
+            function placeFood(type = 'normal') {
+                let newFoodPosition;
+                do {
+                    newFoodPosition = {
+                        x: Math.floor(Math.random() * TILE_COUNT_X),
+                        y: Math.floor(Math.random() * TILE_COUNT_Y)
+                    };
+                } while (snake.some(segment => segment.x === newFoodPosition.x && segment.y === newFoodPosition.y) ||
+                         (type === 'normal' && goldenFood && goldenFood.x === newFoodPosition.x && goldenFood.y === newFoodPosition.y) ||
+                         (type === 'golden' && food && food.x === newFoodPosition.x && food.y === newFoodPosition.y));
+
+                if (type === 'normal') {
+                    food = newFoodPosition;
+                } else if (type === 'golden') {
+                    goldenFood = newFoodPosition;
+                    setTimeout(() => { goldenFood = null; }, 5000);
+                }
+            }
+
+            function updateScoreDisplay() {
+                currentScoreEl.textContent = score;
+                highScoreEl.textContent = highScore;
+            }
+
+            function handleInput(event) {
+                if (gameOver) {
+                     if (event.key === 'Enter' || event.key === ' ') {
+                        setupStartScreen();
+                     }
+                     return;
+                }
+
+                const key = event.key.toLowerCase();
+                let newDirection = { ...direction };
+
+                if (['arrowup', 'w'].includes(key) && direction.y === 0) newDirection = { x: 0, y: -1 };
+                else if (['arrowdown', 's'].includes(key) && direction.y === 0) newDirection = { x: 0, y: 1 };
+                else if (['arrowleft', 'a'].includes(key) && direction.x === 0) newDirection = { x: -1, y: 0 };
+                else if (['arrowright', 'd'].includes(key) && direction.x === 0) newDirection = { x: 1, y: 0 };
+                else if (key === 'p') {
+                    togglePause();
+                    return;
+                }
+
+                if (newDirection.x !== 0 || newDirection.y !== 0) {
+                    if (paused && !gameOver && (direction.x === 0 && direction.y === 0)) {
+                        paused = false;
+                        messageScreen.style.display = 'none';
+                        lastTime = performance.now();
+                        gameLoop(lastTime);
+                    }
+                    direction = newDirection;
+                }
+            }
+
+            function togglePause() {
+                if (gameOver) return;
+                if (direction.x === 0 && direction.y === 0) return;
+
+                paused = !paused;
+                if (!paused) {
+                    lastTime = performance.now();
+                    gameLoop(lastTime);
+                    messageScreen.style.display = 'none';
+                } else {
+                    messageTitleEl.textContent = 'Pauza';
+                    messageTextEl.textContent = 'Naciśnij P, aby wznowić.';
+                    messageScreen.style.display = 'flex';
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                    }
+                }
+            }
+
+            function update() {
+                if (paused || gameOver) return;
+
+                const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+                if (head.x < 0 || head.x >= TILE_COUNT_X || head.y < 0 || head.y >= TILE_COUNT_Y) {
+                    endGame();
+                    return;
+                }
+
+                if (snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
+                    endGame();
+                    return;
+                }
+
+                snake.unshift(head);
+
+                let ateFood = false;
+                if (head.x === food.x && head.y === food.y) {
+                    score += 10;
+                    gameSpeed = Math.max(50, initialSpeed - Math.floor(score / 50) * speedIncrement);
+                    placeFood();
+                    if (score > 0 && score % 50 === 0 && !goldenFood) {
+                        placeFood('golden');
+                    }
+                    ateFood = true;
+                } else if (goldenFood && head.x === goldenFood.x && head.y === goldenFood.y) {
+                    score += 50;
+                    gameSpeed = Math.max(50, initialSpeed - Math.floor(score / 50) * speedIncrement);
+                    goldenFood = null;
+                    ateFood = true;
+                }
+
+                if (!ateFood) {
+                    snake.pop();
+                }
+
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snakeHighScoreV2', highScore);
+                }
+                updateScoreDisplay();
+            }
+
+            function draw() {
+                ctx.fillStyle = BACKGROUND_COLOR;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = GRID_COLOR;
+                for (let i = 0; i < TILE_COUNT_X; i++) {
+                    for (let j = 0; j < TILE_COUNT_Y; j++) {
+                         ctx.strokeRect(i * GRID_SIZE, j * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    }
+                }
+
+                ctx.fillStyle = FOOD_COLOR;
+                if(food) ctx.fillRect(food.x * GRID_SIZE, food.y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+
+                if (goldenFood) {
+                    ctx.fillStyle = GOLDEN_FOOD_COLOR;
+                    ctx.fillRect(goldenFood.x * GRID_SIZE, goldenFood.y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                }
+
+                snake.forEach((segment, index) => {
+                    ctx.fillStyle = index === 0 ? SNAKE_HEAD_COLOR : SNAKE_COLOR;
+                    ctx.fillRect(segment.x * GRID_SIZE, segment.y * GRID_SIZE, GRID_SIZE - 1, GRID_SIZE - 1);
+                });
+            }
+
+            function gameLoop(currentTime) {
+                if (gameOver) return;
+                if (paused) {
+                     if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                     return;
+                }
+
+                animationFrameId = requestAnimationFrame(gameLoop);
+                if (!lastTime) lastTime = currentTime;
+                const deltaTime = currentTime - lastTime;
+                timer += deltaTime;
+
+                if (timer > gameSpeed) {
+                    update();
+                    draw();
+                    timer = 0;
+                }
+                lastTime = currentTime;
+            }
+
+            function setupStartScreen() {
+                initGameVariables();
+                draw();
+                paused = true;
+                gameOver = false;
+                messageTitleEl.textContent = 'Gra Wąż!';
+                messageTextEl.innerHTML = 'Naciśnij klawisz strzałki lub WASD, aby rozpocząć.<br>Celem jest zbieranie jedzenia i unikanie zderzeń!';
+                messageScreen.style.display = 'flex';
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+            }
+
+            function endGame() {
+                gameOver = true;
+                paused = true;
+                messageTitleEl.textContent = 'Koniec Gry!';
+                messageTextEl.innerHTML = `Twój wynik: ${score}.<br>Naciśnij Enter lub Spację, aby zagrać ponownie.`;
+                messageScreen.style.display = 'flex';
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+            }
+
+            document.addEventListener('keydown', handleInput);
+            setupStartScreen();
+        });
+    </script>
 </body>
 </html>
